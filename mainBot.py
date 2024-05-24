@@ -13,18 +13,6 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 dp.middleware.setup(LoggingMiddleware())
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Инициализация базы данных
-init_db()
-
-# Логирование исключений
-@dp.errors_handler(exception=Exception)
-async def global_error_handler(update, exception):
-    logger.exception(f'Update: {update} \n{exception}')
-    return True
 
 if __name__ == '__main__':
     from handlers import dp

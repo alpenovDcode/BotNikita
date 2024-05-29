@@ -56,23 +56,26 @@ def get_user_receipts(receipt_id=None):
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     if receipt_id:
-        cursor.execute("SELECT id, user_id, username, selected_tariff, receipt_photo FROM receipts WHERE id = ?", (receipt_id,))
+        cursor.execute("SELECT id, user_id, username, selected_tariff, receipt_photo, status FROM receipts WHERE id = ?", (receipt_id,))
         receipt = cursor.fetchone()
         conn.close()
         return receipt
     else:
-        cursor.execute("SELECT id, user_id, username, selected_tariff, receipt_photo FROM receipts WHERE status='pending'")
+        cursor.execute("SELECT id, user_id, username, selected_tariff, receipt_photo, status FROM receipts WHERE status='pending'")
         receipts = cursor.fetchall()
         conn.close()
         return receipts
 
-def add_receipt(user_id, username, selected_tariff, receipt_photo):
+
+def add_receipt(user_id, username, selected_tariff, receipt_photo, status='pending'):
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO receipts (user_id, username, selected_tariff, receipt_photo) VALUES (?, ?, ?, ?)",
-                   (user_id, username, selected_tariff, receipt_photo))
+    cursor.execute("INSERT INTO receipts (user_id, username, selected_tariff, receipt_photo, status) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, username, selected_tariff, receipt_photo, status))
     conn.commit()
     conn.close()
+
+
 
 def update_receipt_status(receipt_id, status):
     conn = sqlite3.connect('database.db')

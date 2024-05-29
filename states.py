@@ -11,3 +11,6 @@ class PaymentState(StatesGroup):
 class StartTariffState(StatesGroup):
     in_start_menu = State()
     in_profile_menu = State()
+
+class UpgradeTariffState(StatesGroup):
+    waiting_for_new_tariff = State()

@@ -25,8 +25,17 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(tg_id)
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS questions (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            username TEXT,
+            question TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
+
 
 def check_user_exists(tg_id):
     conn = sqlite3.connect('database.db')
@@ -63,8 +72,10 @@ def get_user_receipts(receipt_id=None):
     else:
         cursor.execute("SELECT id, user_id, username, selected_tariff, receipt_photo, status FROM receipts WHERE status='pending'")
         receipts = cursor.fetchall()
+        print("Fetched receipts:", receipts)  # Добавим этот вывод для отладки
         conn.close()
         return receipts
+
 
 
 def add_receipt(user_id, username, selected_tariff, receipt_photo, status='pending'):
@@ -104,6 +115,22 @@ def delete_receipt(receipt_id):
     cursor.execute("DELETE FROM receipts WHERE id = ?", (receipt_id,))
     conn.commit()
     conn.close()
+
+def save_question(user_id, username, question):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO questions (user_id, username, question) VALUES (?, ?, ?)",
+                   (user_id, username, question))
+    conn.commit()
+    conn.close()
+
+def get_all_questions():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, username, question FROM questions")
+    questions = cursor.fetchall()
+    conn.close()
+    return questions
 
 
 init_db()

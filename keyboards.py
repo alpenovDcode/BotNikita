@@ -16,6 +16,8 @@ def admin_menu_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(KeyboardButton('Список пользователей'))
     keyboard.add(KeyboardButton('Чеки пользователей'))
+    keyboard.add(KeyboardButton('Ответы на вопросы'))
+    keyboard.add(KeyboardButton('Рассылка'))
     return keyboard
 
 def receipt_action_buttons(receipt_id, selected_tariff):
@@ -63,3 +65,9 @@ def upgrade_buttons():
     keyboard.add(InlineKeyboardButton('Тариф Развитие', callback_data='upgrade_development'))
     keyboard.add(InlineKeyboardButton('Тариф Профессионал', callback_data='upgrade_professional'))
     return keyboard
+
+def back_button():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(KeyboardButton('Назад'))
+    return keyboard
+

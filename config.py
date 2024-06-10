@@ -1,16 +1,37 @@
 import openai
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+import logging
+
+# Настройка логгера
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 API_TOKEN = "6786447329:AAGBjuy7GKD1TK-mNYqkO8h2EgH3FNDdtPI"
 ADMINS = [6139227440, 6977471553]
 
-
-model_name = "gpt2"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+api_key = "sk-proj-DBC69MSUGsscp914JnkaT3BlbkFJ7e3CYFFPPMTPudr1sVNU"
+openai.api_key = api_key
 
 def generate_response(prompt):
-    inputs = tokenizer(prompt, return_tensors="pt")
-    outputs = model.generate(inputs.input_ids, max_length=200)
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return response
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150  # Установите ограничение на количество токенов
+        )
+        return response['choices'][0]['message']['content'].strip()
+    except openai.error.RateLimitError as e:
+        logger.error(f"Quota exceeded: {e}")
+        return "Вы превысили лимит использования API. Пожалуйста, проверьте ваш план и детали биллинга."
+    except Exception as e:
+        logger.error(f"Error generating response: {e}")
+        return "Произошла ошибка при генерации ответа."

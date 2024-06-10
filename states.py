@@ -15,11 +15,16 @@ class StartTariffState(StatesGroup):
 
 class UpgradeTariffState(StatesGroup):
     waiting_for_new_tariff = State()
+    in_payment = State()
 
 class BroadcastState(StatesGroup):
     waiting_for_text = State()
     waiting_for_media = State()
 
-class UpgradeTariffState(StatesGroup):
-    waiting_for_new_tariff = State()
-    in_payment = State()
+class AnswerState(StatesGroup):
+    waiting_for_answer = State()
+    current_user_id = State()
+
+class EditProfileState(StatesGroup):
+    waiting_for_new_name = State()
+    waiting_for_new_contact = State()

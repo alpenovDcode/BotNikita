@@ -6,10 +6,11 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import state
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from DB import delete_receipt, check_user_exists, add_user, get_all_users, get_user_receipts, add_receipt, \
-    update_receipt_status, update_user_status, update_user_tariff, get_all_questions, save_question
+    update_receipt_status, update_user_status, update_user_tariff, get_all_questions, save_question, delete_question, \
+    update_user_name, update_user_contact
 from keyboards import start_buttons, tariff_buttons, payment_button, admin_menu_keyboard, receipt_action_buttons, \
-    user_profile_buttons, start_buttons, development_buttons, professional_buttons, upgrade_buttons, back_button
-from states import RegisterState, PaymentState, StartTariffState, UpgradeTariffState, BroadcastState
+    user_profile_buttons, start_buttons, development_buttons, professional_buttons, upgrade_buttons, back_button, user_profile_update_buttons
+from states import RegisterState, PaymentState, StartTariffState, UpgradeTariffState, BroadcastState, AnswerState, EditProfileState
 from mainBot import dp, bot
 
 from config import ADMINS, generate_response
@@ -185,24 +186,55 @@ async def list_receipts(message: types.Message):
         await bot.send_photo(user_id, photo=receipt_photo, caption=caption, reply_markup=receipt_action_buttons(receipt[0], receipt[3]))
     await delete_previous_message(message)
 
-
-
-
-# Обработчик для профиля пользователя
 @dp.message_handler(lambda message: message.text == "Мой профиль", state=[StartTariffState.in_start_menu, StartTariffState.in_profile_menu])
 async def user_profile(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     user = check_user_exists(user_id)
-    await delete_previous_message(message)
+    logger.info(f"Handling 'Мой профиль' for user {user_id}")
 
     if not user:
+        logger.info(f"User {user_id} not found in the database.")
+        await delete_previous_message(message)
         await bot.send_message(user_id, "Пожалуйста, зарегистрируйтесь, используя команду /start.")
         return
 
+    await delete_previous_message(message)
+    logger.info(f"User {user_id} found: {user}")
+
     profile_info = f"Имя: {user[4]}\nТариф: {user[5]}\nКонтактные данные: {user[2]}"
-    keyboard = user_profile_buttons(user[5])
+    keyboard = user_profile_update_buttons(user[5])
     await bot.send_message(user_id, profile_info, reply_markup=keyboard)
     await StartTariffState.in_profile_menu.set()
+
+# Обработчик для inline кнопок редактирования
+@dp.callback_query_handler(lambda c: c.data == 'edit_name', state=StartTariffState.in_profile_menu)
+async def edit_name(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(callback_query.from_user.id, "Введите новое имя:")
+    await EditProfileState.waiting_for_new_name.set()
+
+@dp.callback_query_handler(lambda c: c.data == 'edit_contact', state=StartTariffState.in_profile_menu)
+async def edit_contact(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(callback_query.from_user.id, "Введите новые контактные данные:")
+    await EditProfileState.waiting_for_new_contact.set()
+
+# Обработчики для получения новых значений и обновления базы данных
+@dp.message_handler(state=EditProfileState.waiting_for_new_name)
+async def process_new_name(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    new_name = message.text
+    update_user_name(user_id, new_name)
+    await bot.send_message(user_id, f"Ваше имя обновлено на {new_name}.")
+    await state.finish()
+    await user_profile(message, state)
+
+@dp.message_handler(state=EditProfileState.waiting_for_new_contact)
+async def process_new_contact(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    new_contact = message.text
+    update_user_contact(user_id, new_contact)
+    await bot.send_message(user_id, f"Ваши контактные данные обновлены на {new_contact}.")
+    await state.finish()
+    await user_profile(message, state)
 
 
 # Обработчик для кнопки "Связаться с менеджером"
@@ -225,21 +257,63 @@ async def handle_question(message: types.Message, state: FSMContext):
     await bot.send_message(user_id, "Ваш вопрос отправлен. В ближайшее время с вами свяжутся.", reply_markup=start_buttons())
     await state.finish()
 
+
 @dp.message_handler(lambda message: message.text == "Ответы на вопросы")
 async def list_questions(message: types.Message):
     user_id = message.from_user.id
     if user_id not in ADMINS:
-        await bot.send_message(user_id, "У вас нет доступа к этой команде.")
+        await bot.send_message(chat_id=user_id, text="У вас нет доступа к этой команде.")
         await delete_previous_message(message)
         return
 
     questions = get_all_questions()
     if questions:
         for question in questions:
-            await bot.send_message(user_id, f"Пользователь {question[1]} задал вопрос: {question[2]}")
+            question_text = f"Пользователь {question[1]} задал вопрос: {question[2]}"
+            keyboard = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("Ответить", callback_data=f"answer_{question[0]}_{question[1]}"))
+            await bot.send_message(chat_id=user_id, text=question_text, reply_markup=keyboard)
     else:
-        await bot.send_message(user_id, "Нет новых вопросов.")
+        await bot.send_message(chat_id=user_id, text="Нет новых вопросов.")
     await delete_previous_message(message)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('answer_'))
+async def handle_answer_button(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
+    data = callback_query.data.split('_')
+    question_id = data[1]
+    user_id = data[2]
+
+    await state.update_data(current_user_id=user_id, question_id=question_id)
+    reply_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    reply_markup.add(types.KeyboardButton('Завершить ответ'))
+    await bot.send_message(callback_query.from_user.id, "Введите ваш ответ. Нажмите 'Завершить ответ' для завершения.", reply_markup=reply_markup)
+    await AnswerState.waiting_for_answer.set()
+
+@dp.message_handler(lambda message: message.text == "Завершить ответ", state=AnswerState.waiting_for_answer)
+async def finish_answer(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    question_id = data['question_id']
+
+    # Удаление вопроса из базы данных
+    delete_question(question_id)
+
+    await bot.send_message(message.from_user.id, "Диалог завершен.", reply_markup=admin_menu_keyboard())
+    await state.finish()
+
+@dp.message_handler(state=AnswerState.waiting_for_answer)
+async def process_answer(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    user_id = data['current_user_id']
+    answer = message.text
+
+    try:
+        await bot.send_message(chat_id=user_id, text=f"Администратор ответил на ваш вопрос: {answer}")
+        await bot.send_message(chat_id=message.from_user.id, text="Ваш ответ отправлен пользователю.")
+    except Exception as e:
+        logger.error(f"Ошибка при отправке ответа пользователю {user_id}: {e}")
+        await bot.send_message(chat_id=message.from_user.id, text="Произошла ошибка при отправке ответа.")
+
 
 
 # Handler for approval and rejection of receipts
@@ -287,21 +361,7 @@ async def start_tariff_menu(message: types.Message, state: FSMContext):
     await bot.send_message(message.from_user.id, "Меню тарифа 'Старт':", reply_markup=keyboard)
     await StartTariffState.in_start_menu.set()
 
-# Обработчик для профиля пользователя
-@dp.message_handler(lambda message: message.text == "Мой профиль", state=[StartTariffState.in_start_menu, StartTariffState.in_profile_menu])
-async def user_profile(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    user = check_user_exists(user_id)
-    await delete_previous_message(message)
 
-    if not user:
-        await bot.send_message(user_id, "Пожалуйста, зарегистрируйтесь, используя команду /start.")
-        return
-
-    profile_info = f"Имя: {user[4]}\nТариф: {user[5]}\nКонтактные данные: {user[2]}"
-    keyboard = user_profile_buttons(user[5])
-    await bot.send_message(user_id, profile_info, reply_markup=keyboard)
-    await StartTariffState.in_profile_menu.set()
 
 @dp.message_handler(lambda message: message.text == "ChatGPT", state=StartTariffState.in_start_menu)
 async def chatgpt(message: types.Message):
@@ -310,8 +370,8 @@ async def chatgpt(message: types.Message):
     await StartTariffState.in_chatgpt.set()
 
 # оброботчик для кнопки назад
-@dp.message_handler(lambda message: message.text == "Назад", state=StartTariffState.in_profile_menu)
-async def back_to_start_menu_from_profile(message: types.Message, state: FSMContext):
+@dp.message_handler(lambda message: message.text == "Назад", state=StartTariffState.in_chatgpt)
+async def back_to_start_menu_from_chatgpt(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     user = check_user_exists(user_id)
     await delete_previous_message(message)
@@ -326,11 +386,10 @@ async def back_to_start_menu_from_profile(message: types.Message, state: FSMCont
         await bot.send_message(user_id, "Главный экран:", reply_markup=keyboard)
         await StartTariffState.in_start_menu.set()
 
-# обработчик GPT
+
 @dp.message_handler(state=StartTariffState.in_chatgpt)
 async def handle_chatgpt_question(message: types.Message, state: FSMContext):
     user_question = message.text
-    await delete_previous_message(message)
     await bot.send_message(message.from_user.id, "Ваш вопрос обрабатывается...")
 
     try:
@@ -339,7 +398,6 @@ async def handle_chatgpt_question(message: types.Message, state: FSMContext):
     except Exception as e:
         await bot.send_message(message.from_user.id, f"Произошла ошибка: {e}", reply_markup=back_button())
         logger.error(f"Error handling ChatGPT question: {e}")
-
 
 
 
@@ -382,6 +440,7 @@ async def process_broadcast_text(message: types.Message, state: FSMContext):
     await bot.send_message(message.from_user.id, "Укажите медиа рассылки (фото/видео/файл), или отправьте 'Нет', если медиа нет:")
     await BroadcastState.waiting_for_media.set()
 
+
 # Обработчик для получения медиа или завершения рассылки
 @dp.message_handler(content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO, types.ContentType.DOCUMENT, types.ContentType.TEXT], state=BroadcastState.waiting_for_media)
 async def process_broadcast_media(message: types.Message, state: FSMContext):
@@ -403,15 +462,22 @@ async def process_broadcast_media(message: types.Message, state: FSMContext):
     for user in users:
         try:
             if media:
-                await bot.send_photo(user[0], photo=media, caption=text)
+                if message.photo:
+                    await bot.send_photo(chat_id=user[0], photo=media, caption=text)
+                elif message.video:
+                    await bot.send_video(chat_id=user[0], video=media, caption=text)
+                elif message.document:
+                    await bot.send_document(chat_id=user[0], document=media, caption=text)
             else:
-                await bot.send_message(user[0], text)
+                await bot.send_message(chat_id=user[0], text=text)
         except Exception as e:
             logger.error(f"Ошибка при отправке сообщения пользователю {user[0]}: {e}")
 
     await delete_previous_message(message)
-    await bot.send_message(message.from_user.id, "Рассылка успешно отправлена!", reply_markup=admin_menu_keyboard())
+    await bot.send_message(chat_id=message.from_user.id, text="Рассылка успешно отправлена!", reply_markup=admin_menu_keyboard())
     await state.finish()
+
+
 
 # Обработчик для кнопки "Назад" в состоянии UpgradeTariffState.in_payment
 @dp.message_handler(lambda message: message.text == "Назад", state=UpgradeTariffState.in_payment)

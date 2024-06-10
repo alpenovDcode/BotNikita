@@ -116,21 +116,49 @@ def delete_receipt(receipt_id):
     conn.commit()
     conn.close()
 
+
 def save_question(user_id, username, question):
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('database.db')  # Замените 'database.db' на ваш путь к базе данных
     cursor = conn.cursor()
+
     cursor.execute("INSERT INTO questions (user_id, username, question) VALUES (?, ?, ?)",
                    (user_id, username, question))
     conn.commit()
     conn.close()
 
+
 def get_all_questions():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('database.db')  # Замените 'database.db' на ваш путь к базе данных
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, username, question FROM questions")
+
+    cursor.execute("SELECT id, user_id, question FROM questions")
     questions = cursor.fetchall()
     conn.close()
     return questions
 
+def delete_question(question_id):
+    conn = sqlite3.connect('database.db')  # Замените 'database.db' на ваш путь к базе данных
+    cursor = conn.cursor()
 
+    try:
+        cursor.execute("DELETE FROM questions WHERE id = ?", (question_id,))
+        conn.commit()
+    except Exception as e:
+        print(f"Error deleting question: {e}")
+    finally:
+        conn.close()
+
+def update_user_name(user_id, new_name):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET name = ? WHERE tg_id = ?", (new_name, user_id))
+    conn.commit()
+    conn.close()
+
+def update_user_contact(user_id, new_contact):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET username = ? WHERE tg_id = ?", (new_contact, user_id))
+    conn.commit()
+    conn.close()
 init_db()

@@ -29,6 +29,12 @@ def receipt_action_buttons(receipt_id, selected_tariff):
     keyboard.add(*buttons)
     return keyboard
 
+def user_profile_update_buttons(tariff):
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(InlineKeyboardButton('Редактировать имя', callback_data='edit_name'))
+    keyboard.add(InlineKeyboardButton('Редактировать КД', callback_data='edit_contact'))
+    return keyboard
+
 def user_profile_buttons(tariff):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(KeyboardButton('Связаться с менеджером'))
@@ -56,10 +62,8 @@ def professional_buttons():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(KeyboardButton('Мой профиль'))
     keyboard.row(KeyboardButton('ChatGPT'), KeyboardButton('Полезные материалы'))
-    keyboard.add(KeyboardButton('Глубокая валидация'))
     keyboard.add(KeyboardButton('Связаться с менеджером'))
     return keyboard
-
 def upgrade_buttons():
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton('Тариф Развитие', callback_data='upgrade_development'))
@@ -70,4 +74,3 @@ def back_button():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(KeyboardButton('Назад'))
     return keyboard
-

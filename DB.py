@@ -33,6 +33,18 @@ def init_db():
             question TEXT
         )
     ''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS cheat_sheets (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL
+        )''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS cheat_sheet_files (
+            id INTEGER PRIMARY KEY,
+            cheat_sheet_id INTEGER NOT NULL,
+            file_id TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            FOREIGN KEY (cheat_sheet_id) REFERENCES cheat_sheets(id)
+        )''')
     conn.commit()
     conn.close()
 
@@ -161,4 +173,69 @@ def update_user_contact(user_id, new_contact):
     cursor.execute("UPDATE users SET username = ? WHERE tg_id = ?", (new_contact, user_id))
     conn.commit()
     conn.close()
+
+def save_cheat_sheet(title, content):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO cheat_sheets (title, content) VALUES (?, ?)", (title, content))
+    cheat_sheet_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return cheat_sheet_id
+
+def save_cheat_sheet_file(cheat_sheet_id, file_id, file_type):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO cheat_sheet_files (cheat_sheet_id, file_id, file_type) VALUES (?, ?, ?)", (cheat_sheet_id, file_id, file_type))
+    conn.commit()
+    conn.close()
+
+def get_cheat_sheets():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, content FROM cheat_sheets")
+    rows = cursor.fetchall()
+    cheat_sheets = [{"id": row[0], "title": row[1], "content": row[2]} for row in rows]
+    for cheat_sheet in cheat_sheets:
+        cursor.execute("SELECT id, file_id, file_type FROM cheat_sheet_files WHERE cheat_sheet_id=?", (cheat_sheet["id"],))
+        files = cursor.fetchall()
+        cheat_sheet["files"] = [{"id": file[0], "file_id": file[1], "file_type": file[2]} for file in files]
+    conn.close()
+    return cheat_sheets
+
+def update_cheat_sheet(cheat_sheet_id, title, content):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE cheat_sheets SET title=?, content=? WHERE id=?", (title, content, cheat_sheet_id))
+    conn.commit()
+    conn.close()
+
+def delete_cheat_sheet(cheat_sheet_id):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM cheat_sheets WHERE id=?", (cheat_sheet_id,))
+    cursor.execute("DELETE FROM cheat_sheet_files WHERE cheat_sheet_id=?", (cheat_sheet_id,))
+    conn.commit()
+    conn.close()
+
+def delete_cheat_sheet_file(file_id):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM cheat_sheet_files WHERE id=?", (file_id,))
+    conn.commit()
+    conn.close()
+
+def get_cheat_sheet_by_id(cheat_sheet_id):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, content FROM cheat_sheets WHERE id=?", (cheat_sheet_id,))
+    row = cursor.fetchone()
+    cheat_sheet = {"id": row[0], "title": row[1], "content": row[2]} if row else None
+    if cheat_sheet:
+        cursor.execute("SELECT id, file_id, file_type FROM cheat_sheet_files WHERE cheat_sheet_id=?", (cheat_sheet_id,))
+        files = cursor.fetchall()
+        cheat_sheet["files"] = [{"id": file[0], "file_id": file[1], "file_type": file[2]} for file in files]
+    conn.close()
+    return cheat_sheet
+
 init_db()
